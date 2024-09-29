@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 Game with Custom Images</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #faf8ef;
+        }
+
+        #game-container {
+            width: 800px;
+            height: 800px;
+            background-color: #bbada0;
+            border-radius: 5px;
+            padding: 15px;
+            position: relative;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-gap: 15px;
+            width: 100%;
+            height: 100%;
+        }
+
+        .cell {
+            background-color: #cdc1b4;
+            border-radius: 5px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #776e65;
+            position: relative;
+            aspect-ratio: 1 / 1;
+        }
+
+        .cell img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .game-message {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(238, 228, 218, 0.73);
+            z-index: -1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 60px;
+            font-weight: bold;
+            color: #776e65;
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <audio class="moveSound" src="api/move.m4a"></audio>
+    <audio class="winSound" src="api/win.m4a"></audio>
+    <audio class="lostSound" src="api/lost.m4a"></audio>
+    <div id="game-container">
+        <div class="grid"></div>
+        <div class="game-message"><button class="relocate" onclick="window.location.href='card.html'">看卡卡！</button></div>
+
+    </div>
+
+    <script>
+
+
+        $(document).ready(function () {
+            const grid = $('.grid');
+            let board = [];
+            const size = 4;
+            let gameOver = false;
+
+            // Initialize the game
+            function init() {
+                board = Array(size).fill().map(() => Array(size).fill(0));
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        grid.append('<div class="cell" data-row="' + i + '" data-col="' + j + '"></div>');
+                    }
+                }
+                addRandomTile();
+                addRandomTile();
+                updateGrid();
+            }
+
+            // Add a random tile (2 or 4) to an empty cell
+            function addRandomTile() {
+                const emptyCells = [];
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        if (board[i][j] === 0) {
+                            emptyCells.push({ row: i, col: j });
+                        }
+                    }
+                }
+                if (emptyCells.length > 0) {
+                    const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                    board[randomCell.row][randomCell.col] = Math.random() < 0.9 ? 2 : 4;
+                }
+            }
+
+            const text = {
+                2: '我們一起去賞蟹步道！永遠記得那是最快樂的勞動節',
+                4: '我的畢業典禮，謝謝你陪我一整天，到處拍照真的很快樂',
+                8: '去找傅小童的台中之旅，也是我們在一起的一天！',
+                16: '一起去文博會玩，在路邊野餐看到爸爸媽媽小朋友跟狗狗，真的很理想，很想和你一起這樣生活',
+                32: '颱風天來我們一起去內灣老街玩！',
+                64: '這是我生日那天你帶我吃烤肉，你烤的肉真的很好吃！',
+                128: '當兵完一起去小琉球玩，一起浮淺看海超級幸福',
+                256: '出國前我們一起去吃的串燒店，你中分的開始，我頭髮也慢慢長回來',
+
+            };
+
+
+
+            // Update the grid display
+            function updateGrid() {
+                $('.cell').each(function () {
+                    const row = $(this).data('row');
+                    const col = $(this).data('col');
+                    const value = board[row][col];
+                    $(this).empty();
+                    if (value !== 0) {
+                        const img = $(`<img src="api/${value}.jpg"  title='${text[value]}'` + '" alt="' + value + '">  ');
+                        $(this).append(img);
+                        img.hide().fadeIn(150);
+                    }
+                });
+            }
+
+
+            // Move tiles
+            function move(direction) {
+                if (gameOver) return;
+
+                let moved = false;
+                const rotations = { left: 0, up: 1, right: 2, down: 3 };
+                const rotation = rotations[direction];
+
+                // Rotate the board
+                for (let r = 0; r < rotation; r++) {
+                    board = board[0].map((_, i) => board.map(row => row[i])).reverse();
+                }
+
+                // Move and merge tiles
+                for (let i = 0; i < size; i++) {
+                    let row = board[i].filter(cell => cell !== 0);
+                    for (let j = 0; j < row.length - 1; j++) {
+                        if (row[j] === row[j + 1]) {
+                            row[j] *= 2;
+                            row.splice(j + 1, 1);
+                            moved = true;
+                            if (row[j] === 256) {
+                                showGameMessage('You Win!');
+                                gameOver = true;
+                            }
+                        }
+                    }
+                    row = row.concat(Array(size - row.length).fill(0));
+                    if (row.join(',') !== board[i].join(',')) {
+                        moved = true;
+                    }
+                    board[i] = row;
+                }
+
+                // Rotate the board back
+                for (let r = 0; r < (4 - rotation) % 4; r++) {
+                    board = board[0].map((_, i) => board.map(row => row[i])).reverse();
+                }
+
+                if (moved) {
+                    addRandomTile();
+                    updateGrid();
+                    playMoveSound();
+                }
+
+                if (!canMove()) {
+                    showGameMessage('Game Over');
+                    gameOver = true;
+                }
+            }
+
+            // Check if any moves are possible
+            function canMove() {
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        if (board[i][j] === 0) return true;
+                        if (i < size - 1 && board[i][j] === board[i + 1][j]) return true;
+                        if (j < size - 1 && board[i][j] === board[i][j + 1]) return true;
+                    }
+                }
+                return false;
+            }
+
+            // Show game message (win or lose)
+            function showGameMessage(message) {
+                if (message === 'Game Over') {
+                    playLostSound();
+                    $('.game-message').text(message)
+                }
+                else {
+                    playWinSound();
+                   
+                }
+               
+                $('.game-message').css('z-index', '100');
+                $('.game-message').animate({
+                    opacity: 1
+                }, 'fast');
+
+            }
+
+            // Play move sound
+            function playMoveSound() {
+                $('.moveSound').get(0).play();
+            }
+            function playWinSound() {
+                $('.winSound').get(0).play();
+            }
+            function playLostSound() {
+                $('.lostSound').get(0).play();
+            }
+
+            // Handle key presses
+            $(document).on('keydown', function (e) {
+                switch (e.which) {
+                    case 37: // left
+                        move('left');
+                        break;
+                    case 38: // up
+                        move('up');
+                        break;
+                    case 39: // right
+                        move('right');
+                        break;
+                    case 40: // down
+                        move('down');
+                        break;
+                    default: return;
+                }
+                e.preventDefault();
+            });
+
+            // Initialize the game
+            init();
+        });
+    </script>
+</body>
+
+</html>
